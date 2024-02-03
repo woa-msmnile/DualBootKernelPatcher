@@ -9,7 +9,7 @@ _ShellCodeStart:
     cbz     w5, _UEFI               // Compare w5 with 0, if w5 == 0 goto offset 0x18
 
 _Linux:
-    b       _LinuxStart            // if w5 != 0, cotinue booting linux kernel.
+    b       _LinuxStart            // if w5 != 0, continue booting linux kernel.
 
 _UEFI:
     adr     x4, _KernelHead         // Store kernel head address in x4.

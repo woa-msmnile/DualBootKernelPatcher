@@ -1,8 +1,7 @@
 cmake_minimum_required(VERSION 3.27)
 project(ShellCode ASM)
 
-file(GLOB ASM_SOURCES RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "ShellCode.*.S")
-
+# Set up compilers
 if (CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows")
     # Windows
     # MinGW compiler download link:
@@ -18,6 +17,8 @@ endif ()
 set(CMAKE_AS ${CROSS_COMPILE}as)
 set(CMAKE_OBJCOPY ${CROSS_COMPILE}objcopy)
 
+# Compile ShellCode one by one.
+file(GLOB ASM_SOURCES RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "ShellCode.*.S")
 foreach (CURRENT_ASM_SOURCE_SUFFIX ${ASM_SOURCES})
     string(REGEX REPLACE "(ShellCode.*)\\.S" "\\1" CURRENT_ASM_SOURCE ${CURRENT_ASM_SOURCE_SUFFIX})
     add_custom_target(

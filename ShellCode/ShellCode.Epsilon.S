@@ -2,13 +2,13 @@
 
 _ShellCodeStart:
     movz    x4, #0x9004
-    movk    x4, #0x3d7, lsl #16     // Store 0x03D79004 to x4, which is io status reg of gpio 121.
+    movk    x4, #0x3d7, lsl #16     // Store 0x3D79004 to x4, which is io status reg of gpio 121.
     ldr     w5, [x4]                // Get status value from address stored in x4 and store it to x5.
     and     w5, w5, #1              // Add 1 to the status value stored in w5.
     cbz     w5, _UEFI               // Compare w5 with 0, if w5 == 0 goto offset 0x18
 
 _Linux:
-    b       _LinuxStart            // if w5 != 0, cotinue booting linux kernel.
+    b       _LinuxStart            // if w5 != 0, continue booting linux kernel.
 
 _UEFI:
     adr     x4, _KernelHead         // Store kernel head address in x4.
