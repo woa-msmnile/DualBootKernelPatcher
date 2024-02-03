@@ -10,8 +10,8 @@ _KernelHead:
 
 _LinuxStart:
     b       0x0         // Goto Linux Kernel
-    .long   0           // Unknown
-    .long   0           // Unknown
+    .ascii  "SHLL"      // Unknown, use it as shell code magic here
+    .ascii  "COD\0"     // Unknown, use it as shell code magic here
     .long   0           // Unknown
     .long   0           // Unknown
     .long   0           // Unknown

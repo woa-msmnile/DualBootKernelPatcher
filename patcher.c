@@ -2,17 +2,18 @@
 #include <malloc.h>
 #include <string.h>
 #include <stdint.h>
+#include <errno.h>
 #include "patcher.h"
 
 int main(int argc, char *argv[]) {
     // Print hello message
-    printf("WOA-msmnile DualBoot Kernel Image Patcher v0.0.0.1 !\n");
+    printf("WOA-msmnile DualBoot Kernel Image Patcher v1.0.0.0 !\n");
     printf("Copyright (c) 2021-2024 The DuoWoA authors\n\n");
     if (argc != 6) {
         // Print usage if arg numbers not meet.
         printf("Usage: <Kernel Image to Patch> <UEFI FD Image> <Patched Kernel Image Destination> "
                "<Config File> <Shell Code File>\n");
-        return -1;
+        return -EINVAL;
     }
 
     // Get file paths
@@ -22,10 +23,14 @@ int main(int argc, char *argv[]) {
     char *config = argv[4];
     char *shellCode = argv[5];
 
-    printf("Patching %s with %s and saving to %s...\n", originImage, uefiImage, outputImage);
+    printf("Patching %s with %s and saving to %s...\n\n", originImage, uefiImage, outputImage);
 
     // Read buffer from old kernel.
     size_t originImageSize = get_file_size(originImage);
+    if (originImageSize == 0) {
+        printf("Error: Please check the kernel you provided.\n");
+        return -EINVAL;
+    }
     void *originImageBuffer = malloc(originImageSize);
     FILE *pOriginImageFile = fopen(originImage, "rb");
     fread(originImageBuffer, originImageSize, 1, pOriginImageFile);
@@ -33,6 +38,10 @@ int main(int argc, char *argv[]) {
 
     // Read buffer from uefi image.
     size_t uefiImageSize = get_file_size(uefiImage);
+    if (uefiImageSize == 0) {
+        printf("Error: Please check the uefi fd you provided.\n");
+        return -EINVAL;
+    }
     void *uefiImageBuffer = malloc(uefiImageSize);
     FILE *pUefiImageFile = fopen(uefiImage, "rb");
     fread(uefiImageBuffer, uefiImageSize, 1, pUefiImageFile);
@@ -40,12 +49,19 @@ int main(int argc, char *argv[]) {
 
     // Parse config file.
     Stack stack = {0};
-    parse_config(config, &stack);
+    if (parse_config(config, &stack)) {
+        printf("Error: Please check config your provided.\n");
+        return -EINVAL;
+    }
 
     // Get ShellCode buffer.
     size_t shellCodeSize = get_file_size(shellCode);
     void *shellCodeBuffer = malloc(shellCodeSize);
     FILE *pShellCodeFile = fopen(shellCode, "rb");
+    if (pShellCodeFile == NULL) {
+        printf("Error: Please check the shell code binary you provided.\n");
+        return -EINVAL;
+    }
     fread(shellCodeBuffer, shellCodeSize, 1, pShellCodeFile);
     fclose(pShellCodeFile);
 
@@ -59,8 +75,10 @@ int main(int argc, char *argv[]) {
         FILE *pOutputImageFile = fopen(outputImage, "wb");
         fwrite(outputImageBuffer, outputImageSize, 1, pOutputImageFile);
         fclose(pOriginImageFile);
-    } else
-        return -2;
+    } else {
+        printf("Error Patching Kernel.\n");
+        return -EINVAL;
+    }
 
     // Free buffers.
     free(shellCodeBuffer);
@@ -76,16 +94,24 @@ int main(int argc, char *argv[]) {
 
 size_t get_file_size(char *filePath) {
     FILE *pFile = fopen(filePath, "r");
+    if (pFile == NULL)
+        return 0;
     fseek(pFile, 0, SEEK_END);
     size_t len = ftell(pFile);
     fclose(pFile);
     return len;
 }
 
-void parse_config(char *filePath, pStack stack) {
+int parse_config(char *filePath, pStack stack) {
     FILE *pConfigFile = fopen(filePath, "r");
     char key[256];
-    uint64_t value;
+    uint32_t value = 0;
+
+    // Check File Size
+    if (!get_file_size(filePath))
+        return -1;
+
+    // Parse
     while (fscanf(pConfigFile, "%[^=]=%x\n", key, &value) != EOF) {
         if (strcmp(key, "StackBase") == 0) {
             stack->StackBase = value;
@@ -93,7 +119,9 @@ void parse_config(char *filePath, pStack stack) {
             stack->StackSize = value;
         }
     }
+
     fclose(pConfigFile);
+    return 0;
 }
 
 uint8_t *PatchKernel(uint8_t *kernelBuffer, size_t kernelBufferSize, uint8_t *uefiBuffer, size_t uefiBufferSize,
@@ -105,6 +133,11 @@ uint8_t *PatchKernel(uint8_t *kernelBuffer, size_t kernelBufferSize, uint8_t *ue
     // Copy two buffers into patchedBuffer.
     memcpy(patchedKernelBuffer, kernelBuffer, kernelBufferSize);
     memcpy(patchedKernelBuffer + kernelBufferSize, uefiBuffer, uefiBufferSize);
+
+    if (uefiBufferSize >= 0x40 && strcmp((char *) (shellCodeBuffer + 8), "SHLLCOD") != 0) {
+        printf("Error: shell code binary format not recognize.\n");
+        return NULL;
+    }
 
     // Determine the loading offset of the kernel first,
     // we are either going to find a b instruction on the
@@ -132,7 +165,9 @@ uint8_t *PatchKernel(uint8_t *kernelBuffer, size_t kernelBufferSize, uint8_t *ue
 
     } else if (patchedKernelBuffer[7] != 0x14) {
         // There is no branch instruction!
-        printf("Invalid Kernel Image. Branch instruction not found within first two instruction slots.\n");
+        printf("Error: Invalid Kernel Image. Branch instruction not found within first two instruction slots.\n");
+        return NULL;
+    } else {
         return NULL;
     }
 
@@ -179,6 +214,7 @@ uint8_t *PatchKernel(uint8_t *kernelBuffer, size_t kernelBufferSize, uint8_t *ue
 
     // Now our header is fully patched, let's add a tiny bit
     // of code as well to decide what to do.
+    // Ignore 0x40 Dummy Header in shellCodeBuffer, so we add 0x40 offset after it.
     memcpy(patchedKernelBuffer + 0x40, shellCodeBuffer + 0x40, shellCodeSize - 0x40);
 
     // And that's it, the user now can append executable code right after the kernel,

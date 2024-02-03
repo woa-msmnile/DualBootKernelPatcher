@@ -1,8 +1,9 @@
 .include "DummyHead.S"
 
 _ShellCodeStart:
-    movz    x4, #0x9004
-    movk    x4, #0x3d7, lsl #16     // Store 0x03D79004 to x4, which is io status reg of gpio 121.
+    movz    x4, #0xd000
+    movk    x4, #0x317, lsl #16     // Store 0x317d004 to x4, which is control reg of gpio 125.
+    str     wzr, [x4], #4           // Set 0 in control reg, then x4 add 4
     ldr     w5, [x4]                // Get status value from address stored in x4 and store it to x5.
     and     w5, w5, #1              // Add 1 to the status value stored in w5.
     cbz     w5, _UEFI               // Compare w5 with 0, if w5 == 0 goto offset 0x18

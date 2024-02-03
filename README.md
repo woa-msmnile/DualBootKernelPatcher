@@ -29,7 +29,7 @@
     ```
   - Example
     ```
-    DualBootKernelPatcher kernel SM8150_EFI.fd PacthedKernel DualBoot.Sm8150.cfg Output/ShellCode/ShellCode.Epsilon.bin
+    DualBootKernelPatcher kernel SM8150_EFI.fd PacthedKernel DualBoot.Sm8150.cfg ShellCode.Hotdog.bin
     ```
   - Notice 
     + Shell Code binaries can be find under `output/ShellCode/`
