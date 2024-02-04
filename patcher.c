@@ -126,6 +126,16 @@ int parse_config(char *filePath, pStack stack) {
 
 uint8_t *PatchKernel(uint8_t *kernelBuffer, size_t kernelBufferSize, uint8_t *uefiBuffer, size_t uefiBufferSize,
                      uint8_t *shellCodeBuffer, size_t shellCodeSize, pStack stack) {
+
+    // Check if kernel has UNCOMPRESSED_IMG Header.
+    char kernelHeader[0x11] = {0};
+    memcpy(kernelHeader, kernelBuffer, 0x10);
+    if (strcmp(kernelHeader, "UNCOMPRESSED_IMG") == 0) {
+        printf("Kernel has header, removing it...\n");
+        kernelBuffer += 0x14;
+        kernelBufferSize -= 0x14;
+    }
+
     // Allocate patched image buffer.
     size_t patchedKernelBufferSize = kernelBufferSize + uefiBufferSize;
     uint8_t *patchedKernelBuffer = malloc(patchedKernelBufferSize);
@@ -134,7 +144,7 @@ uint8_t *PatchKernel(uint8_t *kernelBuffer, size_t kernelBufferSize, uint8_t *ue
     memcpy(patchedKernelBuffer, kernelBuffer, kernelBufferSize);
     memcpy(patchedKernelBuffer + kernelBufferSize, uefiBuffer, uefiBufferSize);
 
-    if (uefiBufferSize >= 0x40 && strcmp((char *) (shellCodeBuffer + 8), "SHLLCOD") != 0) {
+    if (uefiBufferSize > 0x40 && strcmp((char *) (shellCodeBuffer + 8), "SHLLCOD") != 0) {
         printf("Error: shell code binary format not recognize.\n");
         return NULL;
     }
