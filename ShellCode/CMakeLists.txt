@@ -17,23 +17,27 @@ endif ()
 set(CMAKE_AS ${CROSS_COMPILE}as)
 set(CMAKE_OBJCOPY ${CROSS_COMPILE}objcopy)
 
+set(SHELLCODE_ELF_DIR "${CMAKE_CURRENT_BINARY_DIR}/elf")
+file(MAKE_DIRECTORY ${SHELLCODE_ELF_DIR})
+
 # Compile ShellCode one by one.
 file(GLOB ASM_SOURCES RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "ShellCode.*.S")
 foreach (CURRENT_ASM_SOURCE_SUFFIX ${ASM_SOURCES})
     string(REGEX REPLACE "(ShellCode.*)\\.S" "\\1" CURRENT_ASM_SOURCE ${CURRENT_ASM_SOURCE_SUFFIX})
+
     add_custom_target(
-        ${CURRENT_ASM_SOURCE}.elf ALL
+        ${CURRENT_ASM_SOURCE}_ELF ALL
         ${CMAKE_AS}
-        ${CMAKE_CURRENT_SOURCE_DIR}/${CURRENT_ASM_SOURCE}.S
+        "${CMAKE_CURRENT_SOURCE_DIR}/${CURRENT_ASM_SOURCE}.S"
         -I ${CMAKE_CURRENT_SOURCE_DIR}
-        -o ${CURRENT_ASM_SOURCE}.elf
+        -o "${SHELLCODE_ELF_DIR}/${CURRENT_ASM_SOURCE}.elf"
     )
 
     add_custom_target(
-        ${CURRENT_ASM_SOURCE}.bin ALL
+        ${CURRENT_ASM_SOURCE}_BIN ALL
         ${CMAKE_OBJCOPY} -O binary
-        ${CURRENT_ASM_SOURCE}.elf
-        ${CURRENT_ASM_SOURCE}.bin
-        DEPENDS ${CURRENT_ASM_SOURCE}.elf
+        "${SHELLCODE_ELF_DIR}/${CURRENT_ASM_SOURCE}.elf"
+        "${CURRENT_ASM_SOURCE}.bin"
+        DEPENDS ${CURRENT_ASM_SOURCE}_ELF
     )
 endforeach ()

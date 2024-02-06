@@ -6,30 +6,30 @@
 // Size of this file must be 0x40 after compiling to binary.
 
 _KernelHead:
-    b       0x40        // Goto ShellCode
+    b       0x40        // Code 1, Goto ShellCode
 
 _LinuxStart:
-    b       0x0         // Goto Linux Kernel
-    .ascii  "SHLL"      // Unknown, use it as shell code magic here
-    .ascii  "COD\0"     // Unknown, use it as shell code magic here
-    .long   0           // Unknown
-    .long   0           // Unknown
-    .long   0           // Unknown
-    .long   0           // Unknown
+    b       0x0         // Code2, Goto Linux Kernel
+    .ascii  "SHLL"      // Image load offset, use it as shell code magic here
+    .ascii  "COD\0"     // Image load offset, use it as shell code magic here
+    .long   0           // Effective Image size L
+    .long   0           // Effective Image size H
+    .long   0           // Flags L
+    .long   0           // Flags H
 
 _StackBase:
-    .long   0           // Stack Base LWORD
-    .long   0           // Stack Base HWORD
+    .long   0           // reserved2, Stack Base LWORD
+    .long   0           // reserved2, Stack Base HWORD
 
 _StackSize:
-    .long   0           // Stack Size L
-    .long   0           // Stack Size H
+    .long   0           // reserved3, Stack Size L
+    .long   0           // reserved3, Stack Size H
 
 _KernelSize:
-    .long   0           // Kernel Size L
-    .long   0           // Kernel Size H
+    .long   0           // reserved4, Kernel Size L
+    .long   0           // reserved4, Kernel Size H
 
-    nop                 // Unknown
-    .long   0           // Unknown
+    nop                 // magic_64
+    .long   0           // reserve5
 
 /* Do not remove the last line  */
