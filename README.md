@@ -11,16 +11,16 @@
     + CMake
   - Clone this repo
     ```
-        git clone https://github.com/woa-msmnile/DualBootKernelPacther
+    git clone https://github.com/woa-msmnile/DualBootKernelPacther
     ```
   - Setup CMake.
     ```
-        cd DualBootKernelPacther
-        cmake -B output -S .
+    cd DualBootKernelPacther
+    cmake -B output -S .
     ```
   - Build !
     ```
-        cmake --build output -j 12
+    cmake --build output -j 12
     ```
 ## Usage
   - Common usage.
