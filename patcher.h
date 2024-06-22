@@ -12,12 +12,12 @@
 #include <stdint.h>
 
 //
-//  Stack info read from config file and set to kernel.
+//  Config info read from config file and set to kernel.
 //
 typedef struct {
     uint64_t StackBase;
     uint64_t StackSize;
-} Stack, *pStack;
+} Config, *pConfig;
 
 //
 // Store some file information and file buffer.
@@ -34,9 +34,9 @@ uint8_t *read_file_content(FileContent *fileContent);
 
 int write_file_content(pFileContent fileContent);
 
-int parse_config(FileContent *fileContent, pStack stack);
+int parse_config(FileContent *fileContent, pConfig config);
 
 uint8_t *PatchKernel(pFileContent kernel, pFileContent uefi, pFileContent shellCode,
-                     pFileContent patchedKernel, pStack stack);
+                     pFileContent patchedKernel, pConfig config);
 
 #endif //LINUX_KERNEL_PATCHER_PATCHER_H

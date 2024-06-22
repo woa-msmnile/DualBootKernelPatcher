@@ -65,7 +65,7 @@ int main(int argc, char *argv[]) {
     read_file_content(&uefiImage);
 
     // Parse config file.
-    Stack stack = {0};
+    Config stack = {0};
     if (parse_config(&config, &stack)) {
         printf("Error: Parse config failed\n");
         return -EINVAL;
@@ -158,11 +158,11 @@ int write_file_content(pFileContent fileContent) {
  * Parse given config.
  *
  * @param fileContent
- * @param stack Stack info read from config file
+ * @param config Config info read from config file
  * @retval -EINVAL Give File not found.
  *
  */
-int parse_config(FileContent *fileContent, pStack stack) {
+int parse_config(FileContent *fileContent, pConfig config) {
     // Check file size
     if (!get_file_size(fileContent))
         return -EINVAL;
@@ -175,9 +175,9 @@ int parse_config(FileContent *fileContent, pStack stack) {
     // Parse
     while (fscanf(pConfigFile, "%[^=]=%x\n", key, &value) != EOF) {
         if (strcmp(key, "StackBase") == 0) {
-            stack->StackBase = value;
+            config->StackBase = value;
         } else if (strcmp(key, "StackSize") == 0) {
-            stack->StackSize = value;
+            config->StackSize = value;
         }
     }
 
@@ -193,13 +193,13 @@ int parse_config(FileContent *fileContent, pStack stack) {
  * @param[in] uefi  uefi fd fileContent
  * @param[in] shellCode shell code binary
  * @param[in,out] patchedKernel patched kernel fileContent
- * @param[in] stack stack info read from config
+ * @param[in] config config info read from config
  *
  * @return patched kernel buffer
  *
  */
 uint8_t *PatchKernel(pFileContent kernel, pFileContent uefi, pFileContent shellCode,
-                     pFileContent patchedKernel, pStack stack) {
+                     pFileContent patchedKernel, pConfig config) {
     // Allocate output buffer
     patchedKernel->fileSize = kernel->fileSize + uefi->fileSize;
     patchedKernel->fileBuffer = malloc(patchedKernel->fileSize);
@@ -298,27 +298,27 @@ uint8_t *PatchKernel(pFileContent kernel, pFileContent uefi, pFileContent shellC
     patchedKernel->fileBuffer[2] = 0;
     patchedKernel->fileBuffer[3] = 0x14;
 
-    // Now we need to fill in the stack base of our firmware
-    // Stack Base: 0x00000000 9FC00000 (64 bit!)
-    patchedKernel->fileBuffer[0x20] = stack->StackBase >> 0 & 0xFF;
-    patchedKernel->fileBuffer[0x21] = stack->StackBase >> 8 & 0xFF;
-    patchedKernel->fileBuffer[0x22] = stack->StackBase >> 16 & 0xFF;
-    patchedKernel->fileBuffer[0x23] = stack->StackBase >> 24 & 0xFF;
-    patchedKernel->fileBuffer[0x24] = stack->StackBase >> 32 & 0xFF;
-    patchedKernel->fileBuffer[0x25] = stack->StackBase >> 40 & 0xFF;
-    patchedKernel->fileBuffer[0x26] = stack->StackBase >> 48 & 0xFF;
-    patchedKernel->fileBuffer[0x27] = stack->StackBase >> 56 & 0xFF;
+    // Now we need to fill in the config base of our firmware
+    // Config Base: 0x00000000 9FC00000 (64 bit!)
+    patchedKernel->fileBuffer[0x20] = config->StackBase >> 0 & 0xFF;
+    patchedKernel->fileBuffer[0x21] = config->StackBase >> 8 & 0xFF;
+    patchedKernel->fileBuffer[0x22] = config->StackBase >> 16 & 0xFF;
+    patchedKernel->fileBuffer[0x23] = config->StackBase >> 24 & 0xFF;
+    patchedKernel->fileBuffer[0x24] = config->StackBase >> 32 & 0xFF;
+    patchedKernel->fileBuffer[0x25] = config->StackBase >> 40 & 0xFF;
+    patchedKernel->fileBuffer[0x26] = config->StackBase >> 48 & 0xFF;
+    patchedKernel->fileBuffer[0x27] = config->StackBase >> 56 & 0xFF;
 
-    // Then we need to fill in the stack size of our firmware
-    // Stack Base: 0x00000000 00300000 (64 bit!)
-    patchedKernel->fileBuffer[0x28] = stack->StackSize >> 0 & 0xFF;
-    patchedKernel->fileBuffer[0x29] = stack->StackSize >> 8 & 0xFF;
-    patchedKernel->fileBuffer[0x2A] = stack->StackSize >> 16 & 0xFF;
-    patchedKernel->fileBuffer[0x2B] = stack->StackSize >> 24 & 0xFF;
-    patchedKernel->fileBuffer[0x2C] = stack->StackSize >> 32 & 0xFF;
-    patchedKernel->fileBuffer[0x2D] = stack->StackSize >> 40 & 0xFF;
-    patchedKernel->fileBuffer[0x2E] = stack->StackSize >> 48 & 0xFF;
-    patchedKernel->fileBuffer[0x2F] = stack->StackSize >> 56 & 0xFF;
+    // Then we need to fill in the config size of our firmware
+    // Config Base: 0x00000000 00300000 (64 bit!)
+    patchedKernel->fileBuffer[0x28] = config->StackSize >> 0 & 0xFF;
+    patchedKernel->fileBuffer[0x29] = config->StackSize >> 8 & 0xFF;
+    patchedKernel->fileBuffer[0x2A] = config->StackSize >> 16 & 0xFF;
+    patchedKernel->fileBuffer[0x2B] = config->StackSize >> 24 & 0xFF;
+    patchedKernel->fileBuffer[0x2C] = config->StackSize >> 32 & 0xFF;
+    patchedKernel->fileBuffer[0x2D] = config->StackSize >> 40 & 0xFF;
+    patchedKernel->fileBuffer[0x2E] = config->StackSize >> 48 & 0xFF;
+    patchedKernel->fileBuffer[0x2F] = config->StackSize >> 56 & 0xFF;
 
     // Finally, we add in the total kernel image size because we need to jump over!
     patchedKernel->fileBuffer[0x30] = kernel->fileSize >> 0 & 0xFF;
