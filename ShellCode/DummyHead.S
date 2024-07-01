@@ -29,7 +29,7 @@ _KernelSize:
     .long   0           // reserved4, Kernel Size L
     .long   0           // reserved4, Kernel Size H
 
-    nop                 // magic_64
+    .ascii  "ARM\x64"   // magic_64
     .long   0           // reserve5
 
 /* Do not remove the last line  */
