@@ -12,12 +12,8 @@
  *  MIT License
  *
  */
-#include <stdio.h>
-#include <malloc.h>
-#include <string.h>
-#include <stdint.h>
-#include <errno.h>
-#include "patcher.h"
+
+#include "utils.h"
 
 /**
  * The main function will check and read given files,
@@ -31,7 +27,7 @@
  */
 int main(int argc, char *argv[]) {
     // Print hello message.
-    printf("WOA-msmnile DualBoot Kernel Image Patcher v1.1.0.0\n");
+    printf("WOA-msmnile DualBoot Kernel Image Patcher v1.2.0.0\n");
     printf("Copyright (c) 2021-2024 The DuoWoA authors\n\n");
     if (argc != 6) {
         // Print usage if arg numbers not meet.
@@ -96,92 +92,7 @@ int main(int argc, char *argv[]) {
 
     // Print end message.
     printf("Image successfully patched.\n");
-    printf("Please find the newly made kernel image at %s.\n", outputImage.filePath);
-    return 0;
-}
-
-/**
- * Get file size based on given fileContent.
- *
- * @param fileContent provide filePath, will also set fileSize in it.
- * @retval 0    File does not exist.
- * @retval size_t   File size
- *
- */
-size_t get_file_size(FileContent *fileContent) {
-    FILE *pFile = fopen(fileContent->filePath, "r");
-    if (pFile == NULL) {
-        printf("Error: %s not found\n", fileContent->filePath);
-        return 0;
-    }
-    fseek(pFile, 0, SEEK_END);
-    size_t len = ftell(pFile);
-    fclose(pFile);
-    fileContent->fileSize = len;
-    return len;
-}
-
-/**
- * Read File buffer based on given fileContent.
- *
- * @param fileContent   provide filePath, will also set fileBuffer in it.
- * @return  Buffer read from file.
- */
-uint8_t *read_file_content(FileContent *fileContent) {
-    if (fileContent->fileBuffer == NULL)
-        return NULL;
-    FILE *pFile = fopen(fileContent->filePath, "rb");
-    if (pFile == NULL)
-        return NULL;
-    fread(fileContent->fileBuffer, fileContent->fileSize, 1, pFile);
-    fclose(pFile);
-    return fileContent->fileBuffer;
-}
-
-/**
- * Write buffer to filePath given by fileContent.
- *
- * @param fileContent   Contains file information.
- * @retval -EBADF   Failed to write file
- *
- */
-int write_file_content(pFileContent fileContent) {
-    FILE *pFile = fopen(fileContent->filePath, "wb");
-    if (pFile == NULL)
-        return -EBADF;
-    fwrite(fileContent->fileBuffer, fileContent->fileSize, 1, pFile);
-    fclose(pFile);
-    return 0;
-}
-
-/**
- * Parse given config.
- *
- * @param fileContent
- * @param config Config info read from config file
- * @retval -EINVAL Give File not found.
- *
- */
-int parse_config(FileContent *fileContent, pConfig config) {
-    // Check file size
-    if (!get_file_size(fileContent))
-        return -EINVAL;
-
-    // Open config file
-    FILE *pConfigFile = fopen(fileContent->filePath, "r");
-    char key[256];
-    uint32_t value = 0;
-
-    // Parse
-    while (fscanf(pConfigFile, "%[^=]=%x\n", key, &value) != EOF) {
-        if (strcmp(key, "StackBase") == 0) {
-            config->StackBase = value;
-        } else if (strcmp(key, "StackSize") == 0) {
-            config->StackSize = value;
-        }
-    }
-
-    fclose(pConfigFile);
+    printf("Please check the patched kernel image at %s.\n", outputImage.filePath);
     return 0;
 }
 
@@ -209,7 +120,7 @@ uint8_t *PatchKernel(pFileContent kernel, pFileContent uefi, pFileContent shellC
     memcpy(patchedKernel->fileBuffer + kernel->fileSize, uefi->fileBuffer, uefi->fileSize);
 
     // Check ShellCode binary magic.
-    if (uefi->fileSize > 0x40 && strcmp((char *) (shellCode->fileBuffer + 8), "SHLLCOD") != 0) {
+    if (shellCode->fileSize > 0x40 && strcmp((char *) (shellCode->fileBuffer + 8), "SHLLCOD") != 0) {
         printf("Error: shell code binary format not recognize.\n");
         return NULL;
     }
@@ -224,37 +135,55 @@ uint8_t *PatchKernel(pFileContent kernel, pFileContent uefi, pFileContent shellC
         hasHeader |= 0b1;
     }
 
-    // Check if kernel size % 0x10 == 0, which will cause copy loop issue.
-    if (kernel->fileSize % 0x10 != 0) {
+    // Check if kernel size % 0x10 == 0, which will cause copy loop(in shellcode) issue.
+    if (kernel->fileSize % 0x10) {
         printf("Align kernel size to 0x10.\n");
+
+        // Calculate align padding
+        uint8_t padding = 0x10 - (kernel->fileSize % 0x10);
+
+        // New kernel size and output size
+        kernel->fileSize += padding;
+        patchedKernel->fileSize += padding;
+
         // Reallocate patched kernel.
-        void *ptr = realloc(patchedKernel->fileBuffer, patchedKernel->fileSize + (kernel->fileSize % 10));
+        void *ptr = realloc(patchedKernel->fileBuffer, patchedKernel->fileSize);
         if (ptr == NULL) {
             printf("Failed to reallocate patched kernel buffer.");
             return NULL;
         } else patchedKernel->fileBuffer = ptr;
-        // Copy uefi image to 0x10 align place.
-        uint8_t padding = 0x10 - (kernel->fileSize % 0x10);
-        memmove(patchedKernel->fileBuffer + kernel->fileSize + padding,
-                patchedKernel->fileBuffer + kernel->fileSize, uefi->fileSize);
-        kernel->fileSize += padding;
-        patchedKernel->fileSize += padding;
-    }
 
-    // Check if kernel has EFI Stub, 4D5A0091, "MZ"
-    // Note: This magic is part of kernel
-    // We wil rewrite file header here.
-    // For kernel with EFI stub, we only need to patch the efi header.
-    memcpy(kernelHeader, kernel->fileBuffer, 0x4);
-    if (*(uint32_t *) kernelHeader == 0x91005A4D) {
-        printf("Kernel has EFI header.\n");
-        hasHeader |= 0b10;
+        // Copy uefi image to 0x10 align place and fill padding part to 0.
+        if (hasHeader & 0b1) // Kernel has header, need to add 0x14 offset while copying.
+        {
+            memmove(patchedKernel->fileBuffer + kernel->fileSize + 0x14,
+                    patchedKernel->fileBuffer + kernel->fileSize - padding + 0x14, uefi->fileSize);
+            memset(patchedKernel->fileBuffer + kernel->fileSize - padding + 0x14, 0, padding);
+        } else {
+            memmove(patchedKernel->fileBuffer + kernel->fileSize,
+                    patchedKernel->fileBuffer + kernel->fileSize - padding, uefi->fileSize);
+            memset(patchedKernel->fileBuffer + kernel->fileSize - padding, 0, padding);
+        }
     }
 
     // Kernel has uncompressed_img header,
-    if(hasHeader & 1)
+    if (hasHeader & 1)
         // Move our pointer after UNCOMPRESSED_IMG header before further processing,
         patchedKernel->fileBuffer += 0x14;
+
+    /* Reserved for feature use */
+    // Check if kernel was already patched.
+    //   if config in kernel was same with the config provided here,
+    //   set kernel size to previous kernel size. (which skipped copying previously uefi fd)
+    //    if (*(uint64_t *) (kernel->fileBuffer + 0x20) == config->StackBase &&
+    //        *(uint64_t *) (kernel->fileBuffer + 0x28) == config->StackSize) {
+    //        printf("Kernel was already patched previously!\n"
+    //               "Re-patching with new UEFI...\n");
+    //        kernel->fileSize = *(uint64_t *) (kernel->fileBuffer + 0x30);
+    //        patchedKernel->fileSize = kernel->fileSize + uefi->fileSize; // Update output kernel size
+    //        printf("Old kernel size %llx\n", *(uint64_t *) (kernel->fileBuffer + 0x30));
+    //        hasHeader |= 0b10;
+    //    }
 
     // Determine the loading offset of the kernel first,
     // we are either going to find a b instruction on the
@@ -262,7 +191,9 @@ uint8_t *PatchKernel(pFileContent kernel, pFileContent uefi, pFileContent shellC
     // second is fine.
 
     // 0x14 is AArch64 b opcode
-    if (patchedKernel->fileBuffer[3] == 0x14) {
+    // If Code1 is jump instruction, the kernel is an original kernel or a patched kernel.
+    // However, if Code2 is also jump instruction, the kernel should be a patched kernel.
+    if (patchedKernel->fileBuffer[3] == 0x14 && patchedKernel->fileBuffer[7] != 0x14) {
         // For kernel without EFI stub, we have to move the jump kernel instruction forward to Code2.
         // We have a branch instruction first, we need to fix things a bit.
 
@@ -282,8 +213,21 @@ uint8_t *PatchKernel(pFileContent kernel, pFileContent uefi, pFileContent shellC
         patchedKernel->fileBuffer[5] = offsetInstructionBuffer[1];
         patchedKernel->fileBuffer[6] = offsetInstructionBuffer[2];
         patchedKernel->fileBuffer[7] = 0x14;
-    }
-    else if (patchedKernel->fileBuffer[7] != 0x14) {
+    } else // Patched Kernel
+    if (patchedKernel->fileBuffer[3] == 0x14 && patchedKernel->fileBuffer[7] == 0x14) {
+        printf("Patched kernel detected, redo patch with new fd.\n");
+        kernel->fileSize = *(uint64_t *) (kernel->fileBuffer + 0x30);
+        patchedKernel->fileSize = kernel->fileSize + uefi->fileSize; // Update output kernel size
+    } else // Kernel with EFI Stub
+    if (*(uint16_t *) (patchedKernel->fileBuffer) == 0x5A4D && patchedKernel->fileBuffer[7] == 0x14) {
+        // Check if kernel has EFI Stub, 4D5A, "MZ"
+        // Note:
+        //   The magic is also an arm64 instruction, and the second instruction jump to kernel.
+        // We will only rewrite EFI header here. (This will break the kernel)
+        // For kernel with EFI stub, we only need to patch the efi header.
+        printf("Kernel has EFI header.\n");
+    } else // Unknown stuff
+    if (patchedKernel->fileBuffer[7] != 0x14) {
         // There is no branch instruction!
         printf("Error: Invalid Kernel Image. Branch instruction not found within first two instruction slots.\n");
         return NULL;

@@ -9,7 +9,11 @@
 #ifndef LINUX_KERNEL_PATCHER_PATCHER_H
 #define LINUX_KERNEL_PATCHER_PATCHER_H
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <stdint.h>
+#include <errno.h>
 
 //
 //  Config info read from config file and set to kernel.
@@ -39,4 +43,5 @@ int parse_config(FileContent *fileContent, pConfig config);
 uint8_t *PatchKernel(pFileContent kernel, pFileContent uefi, pFileContent shellCode,
                      pFileContent patchedKernel, pConfig config);
 
+uint8_t *Remove(pFileContent patchedKernel, pFileContent outputKernel);
 #endif //LINUX_KERNEL_PATCHER_PATCHER_H
